@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+  Env:
+    Type: String
+    Default: NoValue
+  InstanceType:
+    AllowedValues:
+      - t2.micro
+    Default: t2.micro
+    Type: String
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+    
+Resources:
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType:
+        Ref: InstanceType
+      KeyName:
+        Ref: KeyName
+      SecurityGroups:
+      - Ref: WebServerSecurityGroup
+      Tags:
+        - Key: env
+          Value: !Ref Env
+      UserData:
+        Fn::Base64: |
+           #!/bin/bash -xe
+           yum update -y aws-cfn-bootstrap
+           yum install -y httpd
+           systemctl enable httpd.service
+           systemctl start httpd.service
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Enable HTTP access via port 80"
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        FromPort: 80
+        IpProtocol: tcp
+        ToPort: 80
+
+Outputs:
+  PublicIP:
+    Description: EC2 public IP
+    Value: !GetAtt WebServer.PublicIp
+  WebsiteURL:
+    Description: Website URL
+    Value: !Sub "http://${WebServer.PublicDnsName}/"
